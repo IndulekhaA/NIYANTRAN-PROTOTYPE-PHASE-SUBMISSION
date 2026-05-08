@@ -1,2 +1,2 @@
 # NIYANTRAN-PROTOTYPE-PHASE-SUBMISSION
-AI-driven smart grid coordination platform for EV load balancing using LSTM forecasting, multi-agent charging control, and V2G integration to prevent feeder overloads and optimize Bengaluru’s power distribution network in real time.
+A futuristic smart-grid prototype visualizing how AI can coordinate EV charging across Bengaluru to reduce overloads, stabilize feeder demand, and transform electric vehicles into a distributed energy resource. This repository contains the project website, animations, and concept demonstration.
