@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIYANTRAN — Bengaluru EV Grid Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   ROOT & TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --bg:       #060a0e;
+  --surface0: #0c1117;
+  --surface1: #111820;
+  --surface2: #182028;
+  --surface3: #1e2830;
+  --border0:  rgba(255,255,255,0.04);
+  --border1:  rgba(255,255,255,0.09);
+  --border2:  rgba(255,255,255,0.18);
+
+  --cyan:     #00e5ff;
+  --cyan-dim: #006b7a;
+  --cyan-glow:rgba(0,229,255,0.12);
+  --green:    #00ff9d;
+  --green-dim:#00734a;
+  --green-glow:rgba(0,255,157,0.10);
+  --amber:    #ffb800;
+  --amber-dim:#7a5700;
+  --amber-glow:rgba(255,184,0,0.10);
+  --red:      #ff3b3b;
+  --red-dim:  #7a1c1c;
+  --red-glow: rgba(255,59,59,0.12);
+  --blue:     #4d9fff;
+  --blue-dim: #1a407a;
+  --blue-glow:rgba(77,159,255,0.10);
+  --purple:   #b06aff;
+
+  --txt:      #d8e4ec;
+  --txt-dim:  rgba(216,228,236,0.45);
+  --txt-muted:rgba(216,228,236,0.22);
+
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+
+  --r: 3px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--txt);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grid noise overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.013) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.013) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Vignette */
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.55) 100%);
+}
+
+/* ═══════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════ */
+header {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: 0 1.5rem;
+  height: 52px;
+  background: rgba(6,10,14,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border1);
+}
+
+.logo {
+  display: flex; align-items: center; gap: 0.75rem;
+  flex-shrink: 0;
+}
+.logo-icon {
+  width: 30px; height: 30px;
+  background: var(--cyan);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 0.65rem; font-weight: 600; color: #000;
+}
+.logo-name {
+  font-family: var(--mono); font-size: 0.85rem; font-weight: 600;
+  color: var(--cyan); letter-spacing: 0.2em; text-transform: uppercase;
+}
+.logo-sub {
+  font-size: 0.58rem; color: var(--txt-muted); letter-spacing: 0.08em;
+  margin-top: 1px;
+}
+
+nav {
+  display: flex; gap: 0.25rem;
+  flex: 1; justify-content: center;
+}
+.nav-btn {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--mono); font-size: 0.65rem; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--txt-muted); padding: 0.35rem 0.85rem;
+  border-radius: var(--r);
+  transition: all 0.15s;
+  position: relative;
+}
+.nav-btn:hover { color: var(--txt); background: var(--surface2); }
+.nav-btn.active {
+  color: var(--cyan);
+  background: var(--cyan-glow);
+}
+.nav-btn.active::after {
+  content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+  width: 24px; height: 1px; background: var(--cyan);
+}
+
+.hdr-right {
+  display: flex; align-items: center; gap: 1rem; flex-shrink: 0;
+}
+.live-badge {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: var(--mono); font-size: 0.6rem; font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--green);
+  border: 1px solid var(--green-dim);
+  padding: 0.2rem 0.6rem; border-radius: 2px;
+  background: var(--green-glow);
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 1px;
+  background: var(--green);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+.hdr-clock {
+  font-family: var(--mono); font-size: 0.7rem;
+  color: var(--txt-muted);
+}
+
+.hdr-upload-btn {
+  background: none; border: 1px solid var(--border2);
+  color: var(--txt-dim); cursor: pointer;
+  font-family: var(--mono); font-size: 0.6rem; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.3rem 0.7rem; border-radius: var(--r);
+  transition: all 0.15s;
+}
+.hdr-upload-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+#file-input { display: none; }
+
+/* ═══════════════════════════════════════════
+   MAIN LAYOUT
+═══════════════════════════════════════════ */
+main {
+  position: relative; z-index: 1;
+  padding: 1.25rem 1.5rem 4rem;
+}
+.page { display: none; }
+.page.active { display: block; }
+
+/* ═══════════════════════════════════════════
+   SECTION HEADERS
+═══════════════════════════════════════════ */
+.sec-hdr {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-bottom: 1rem; padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border1);
+}
+.sec-hdr-line {
+  width: 3px; height: 14px; background: var(--cyan); border-radius: 2px;
+  flex-shrink: 0;
+}
+.sec-hdr-line.amber { background: var(--amber); }
+.sec-hdr-line.green { background: var(--green); }
+.sec-hdr-line.red   { background: var(--red); }
+.sec-hdr-line.blue  { background: var(--blue); }
+.sec-title {
+  font-family: var(--mono); font-size: 0.62rem; font-weight: 600;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--txt-dim);
+}
+.sec-meta {
+  font-family: var(--mono); font-size: 0.58rem; color: var(--txt-muted);
+  margin-left: auto;
+}
+
+/* ═══════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════ */
+.card {
+  background: var(--surface1);
+  border: 1px solid var(--border1);
+  border-radius: var(--r);
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+}
+.card-title {
+  font-family: var(--mono); font-size: 0.58rem; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--txt-muted);
+  margin-bottom: 0.85rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* ═══════════════════════════════════════════
+   KPI ROW
+═══════════════════════════════════════════ */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--border1);
+  border: 1px solid var(--border1);
+  border-radius: var(--r);
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.kpi {
+  background: var(--surface1);
+  padding: 1rem 1.1rem;
+  display: flex; flex-direction: column; gap: 0.3rem;
+  position: relative;
+}
+.kpi::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+}
+.kpi.cyan::after   { background: var(--cyan); }
+.kpi.green::after  { background: var(--green); }
+.kpi.amber::after  { background: var(--amber); }
+.kpi.red::after    { background: var(--red); }
+.kpi.blue::after   { background: var(--blue); }
+
+.kpi-val {
+  font-family: var(--mono); font-size: 1.65rem; font-weight: 600; line-height: 1;
+  letter-spacing: -0.02em;
+}
+.kpi-val.cyan   { color: var(--cyan); }
+.kpi-val.green  { color: var(--green); }
+.kpi-val.amber  { color: var(--amber); }
+.kpi-val.red    { color: var(--red); }
+.kpi-val.blue   { color: var(--blue); }
+
+.kpi-label {
+  font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--txt-muted);
+}
+.kpi-sub {
+  font-family: var(--mono); font-size: 0.58rem; color: var(--txt-muted);
+}
+
+/* ═══════════════════════════════════════════
+   GRID LAYOUTS
+═══════════════════════════════════════════ */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 0.75rem; margin-bottom: 1rem; }
+.g2-wide { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.g2-slim { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 1rem; }
+
+/* ═══════════════════════════════════════════
+   ZONE TILES
+═══════════════════════════════════════════ */
+.zones-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem; margin-bottom: 1.5rem;
+}
+.zone-tile {
+  background: var(--surface1); border: 1px solid var(--border1);
+  border-radius: var(--r); padding: 1rem;
+  cursor: pointer; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.zone-tile::after {
+  content: ''; position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(ellipse at top left, var(--cyan-glow), transparent 60%);
+  transition: opacity 0.3s;
+}
+.zone-tile:hover::after { opacity: 1; }
+.zone-tile:hover { border-color: var(--border2); transform: translateY(-2px); }
+.zone-tile.selected { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan-dim); }
+
+.zone-tile-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.zone-tile.safe    .zone-tile-bar { background: var(--green); }
+.zone-tile.warning .zone-tile-bar { background: var(--amber); }
+.zone-tile.critical .zone-tile-bar { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+.zone-name {
+  font-family: var(--mono); font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.06em; color: var(--txt); margin-bottom: 0.6rem;
+}
+.zone-util-row {
+  display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 0.5rem;
+}
+.zone-util {
+  font-family: var(--mono); font-size: 1.45rem; font-weight: 500; line-height: 1;
+}
+.zone-tile.safe    .zone-util { color: var(--green); }
+.zone-tile.warning .zone-util { color: var(--amber); }
+.zone-tile.critical .zone-util { color: var(--red); }
+
+.zone-sparkline { display: flex; align-items: flex-end; gap: 2px; height: 24px; }
+.sbar {
+  width: 3px; border-radius: 1px;
+  background: var(--border2);
+  transition: height 0.6s ease, background 0.3s;
+}
+
+.zone-progress {
+  width: 100%; height: 3px;
+  background: var(--surface3); border-radius: 1px;
+  overflow: hidden; margin-bottom: 0.45rem;
+}
+.zone-progress-fill {
+  height: 100%; border-radius: 1px;
+  transition: width 1s ease;
+}
+.zone-tile.safe    .zone-progress-fill { background: var(--green); }
+.zone-tile.warning .zone-progress-fill { background: var(--amber); }
+.zone-tile.critical .zone-progress-fill { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+.zone-meta-row {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 0.58rem; color: var(--txt-muted);
+}
+.zone-alert-tag {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  font-family: var(--mono); font-size: 0.52rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.12rem 0.35rem; border-radius: 1px;
+  display: none;
+}
+.zone-tile.critical .zone-alert-tag {
+  display: block; background: var(--red); color: #fff;
+  animation: blink-tag 0.8s ease-in-out infinite;
+}
+@keyframes blink-tag { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ═══════════════════════════════════════════
+   ALERT FEED
+═══════════════════════════════════════════ */
+.alert-feed { margin-bottom: 1.25rem; }
+.alert-item {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--r);
+  margin-bottom: 0.3rem;
+  font-size: 0.75rem; line-height: 1.5;
+  border-left: 2px solid;
+  animation: slide-in 0.25s ease;
+}
+@keyframes slide-in { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+.alert-item.danger   { background: rgba(255,59,59,0.06); border-color: var(--red); }
+.alert-item.warning  { background: rgba(255,184,0,0.06); border-color: var(--amber); }
+.alert-item.resolved { background: rgba(0,255,157,0.05); border-color: var(--green); }
+.alert-item.info     { background: rgba(77,159,255,0.05); border-color: var(--blue); }
+.alert-icon { font-size: 0.9rem; flex-shrink: 0; margin-top: 1px; }
+.alert-body { flex: 1; }
+.alert-ts   { font-family: var(--mono); font-size: 0.58rem; color: var(--txt-muted); flex-shrink: 0; margin-top: 1px; }
+
+/* ═══════════════════════════════════════════
+   CHART WRAPPERS
+═══════════════════════════════════════════ */
+.ch          { position: relative; }
+.ch-160      { height: 160px; }
+.ch-200      { height: 200px; }
+.ch-240      { height: 240px; }
+.ch-280      { height: 280px; }
+
+/* ═══════════════════════════════════════════
+   FORECAST CARDS
+═══════════════════════════════════════════ */
+.forecast-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0.75rem; margin-bottom: 1.25rem;
+}
+.fc-card {
+  background: var(--surface1); border: 1px solid var(--border1);
+  border-radius: var(--r); padding: 1rem;
+  display: grid; grid-template-columns: 150px 1fr; gap: 1rem; align-items: center;
+}
+.fc-name { font-family: var(--mono); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.4rem; }
+.fc-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--border0);
+  font-size: 0.68rem;
+}
+.fc-row:last-child { border-bottom: none; }
+.fc-row-label { color: var(--txt-muted); }
+.fc-row-val { font-family: var(--mono); font-weight: 500; }
+.fc-bar-area { height: 48px; }
+
+/* ═══════════════════════════════════════════
+   MARL AGENT GRID
+═══════════════════════════════════════════ */
+.zone-tabs {
+  display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.zone-tab {
+  background: var(--surface2); border: 1px solid var(--border1);
+  color: var(--txt-muted); cursor: pointer;
+  font-family: var(--mono); font-size: 0.6rem; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.28rem 0.65rem; border-radius: var(--r);
+  transition: all 0.15s;
+}
+.zone-tab:hover { color: var(--txt); border-color: var(--border2); }
+.zone-tab.active { color: var(--cyan); border-color: var(--cyan-dim); background: var(--cyan-glow); }
+
+.agent-matrix {
+  display: grid; grid-template-columns: repeat(10, 1fr);
+  gap: 3px; margin: 0.75rem 0;
+}
+.agent-node {
+  aspect-ratio: 1; border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 0.45rem;
+  cursor: default; transition: all 0.4s;
+}
+.agent-node.pause    { background: var(--surface3); color: var(--txt-muted); }
+.agent-node.low      { background: rgba(0,255,157,0.12); color: var(--green); }
+.agent-node.mid      { background: rgba(0,255,157,0.22); color: var(--green); }
+.agent-node.full     { background: rgba(0,255,157,0.35); color: var(--green); }
+.agent-node.v2g      { background: rgba(77,159,255,0.22); color: var(--blue); }
+.agent-node.shifting { animation: shift-anim 0.6s ease; }
+@keyframes shift-anim { 0%{transform:scale(1)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }
+
+.agent-legend {
+  display: flex; gap: 1.25rem; flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem; color: var(--txt-muted); }
+.legend-dot  { width: 8px; height: 8px; border-radius: 2px; }
+
+/* ═══════════════════════════════════════════
+   DISPATCH
+═══════════════════════════════════════════ */
+.vbat-strip {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  background: var(--surface1); border: 1px solid var(--cyan-dim);
+  border-radius: var(--r); overflow: hidden;
+  margin-bottom: 1.25rem; gap: 1px; background: var(--border1);
+}
+.vbat-cell {
+  background: var(--surface0);
+  padding: 1rem 1.25rem;
+}
+.vbat-val {
+  font-family: var(--mono); font-size: 1.4rem; font-weight: 500;
+  color: var(--cyan); line-height: 1;
+}
+.vbat-label {
+  font-size: 0.58rem; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--txt-muted); margin-top: 0.3rem;
+}
+
+.dispatch-zone {
+  background: var(--surface1); border: 1px solid var(--border1);
+  border-radius: var(--r); padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+  display: grid; grid-template-columns: 160px 1fr auto;
+  align-items: center; gap: 1rem;
+}
+.dispatch-zone.active {
+  border-color: var(--amber-dim);
+  background: rgba(255,184,0,0.03);
+}
+.dispatch-zone-name { font-family: var(--mono); font-size: 0.75rem; font-weight: 600; }
+.dispatch-status {
+  font-size: 0.58rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.5rem; border-radius: 1px; margin-top: 0.3rem; display: inline-block;
+}
+.dispatch-status.none     { background: var(--green-glow); color: var(--green); border: 1px solid var(--green-dim); }
+.dispatch-status.dispatch { background: var(--amber-glow); color: var(--amber); border: 1px solid var(--amber-dim); }
+.dispatch-status.critical { background: var(--red-glow); color: var(--red); border: 1px solid var(--red-dim); }
+.dispatch-metrics {
+  display: flex; gap: 1.5rem;
+}
+.dm { display: flex; flex-direction: column; gap: 0.2rem; }
+.dm-label { font-size: 0.57rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--txt-muted); }
+.dm-val { font-family: var(--mono); font-size: 0.88rem; color: var(--txt); }
+.dispatch-bar-wrap { width: 120px; }
+.dispatch-bar {
+  height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden;
+}
+.dispatch-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; background: var(--green); }
+
+/* ═══════════════════════════════════════════
+   INFRASTRUCTURE TABLE
+═══════════════════════════════════════════ */
+.infra-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.73rem;
+}
+.infra-table th {
+  font-family: var(--mono); font-size: 0.57rem; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--txt-muted);
+  padding: 0.55rem 0.85rem; border-bottom: 1px solid var(--border2);
+  text-align: left; background: var(--surface0);
+}
+.infra-table td {
+  padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border0);
+}
+.infra-table tr:hover td { background: var(--surface2); }
+.rank-badge {
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.rank-badge.r1 { background: rgba(255,59,59,0.2); color: var(--red); border: 1px solid var(--red-dim); }
+.rank-badge.r2 { background: rgba(255,59,59,0.12); color: rgba(255,59,59,0.7); border: 1px solid var(--red-dim); }
+.rank-badge.rx { background: var(--surface3); color: var(--txt-muted); border: 1px solid var(--border1); }
+
+.score-pill {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.score-track { flex: 1; height: 3px; background: var(--surface3); border-radius: 1px; }
+.score-fill  { height: 100%; border-radius: 1px; background: var(--cyan); }
+.score-num   { font-family: var(--mono); font-size: 0.65rem; color: var(--txt-dim); min-width: 32px; }
+
+.action-badge {
+  font-family: var(--mono); font-size: 0.55rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.15rem 0.45rem; border-radius: 1px;
+}
+.action-badge.watch  { background: var(--green-glow); color: var(--green); border: 1px solid var(--green-dim); }
+.action-badge.plan   { background: var(--amber-glow); color: var(--amber); border: 1px solid var(--amber-dim); }
+.action-badge.act    { background: var(--red-glow); color: var(--red); border: 1px solid var(--red-dim); }
+
+.ev-density-bar {
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.ev-dots { display: flex; gap: 2px; }
+.ev-dot { width: 5px; height: 5px; border-radius: 1px; background: var(--surface3); }
+.ev-dot.active { background: var(--blue); }
+
+/* ═══════════════════════════════════════════
+   STATUS BAR
+═══════════════════════════════════════════ */
+.status-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  height: 28px;
+  background: rgba(6,10,14,0.95);
+  border-top: 1px solid var(--border1);
+  display: flex; align-items: center; gap: 0; overflow: hidden;
+}
+.sb-cell {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0 1rem;
+  border-right: 1px solid var(--border1);
+  font-family: var(--mono); font-size: 0.58rem;
+  color: var(--txt-muted); white-space: nowrap;
+}
+.sb-cell:last-child { border-right: none; margin-left: auto; }
+.sb-val { color: var(--cyan); }
+.sb-val.green { color: var(--green); }
+.sb-val.amber { color: var(--amber); }
+.sb-val.red   { color: var(--red); }
+
+/* scanning line */
+.sb-scan {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+.sb-scan::after {
+  content: '';
+  position: absolute; top: 0; left: -100%; width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,229,255,0.08), transparent);
+  animation: scan 3s linear infinite;
+}
+@keyframes scan { from{left:-30%} to{left:130%} }
+
+/* ═══════════════════════════════════════════
+   MINI METRIC WIDGET
+═══════════════════════════════════════════ */
+.metric-row {
+  display: flex; flex-direction: column; gap: 0.4rem;
+}
+.metric-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface2); border-radius: var(--r);
+  border: 1px solid var(--border0);
+}
+.metric-label { font-size: 0.65rem; color: var(--txt-dim); flex: 1; }
+.metric-val { font-family: var(--mono); font-size: 0.78rem; font-weight: 500; }
+.metric-bar { width: 80px; height: 3px; background: var(--surface3); border-radius: 1px; overflow: hidden; }
+.metric-bar-fill { height: 100%; border-radius: 1px; transition: width 1s; }
+
+/* ═══════════════════════════════════════════
+   TREND CHIPS
+═══════════════════════════════════════════ */
+.chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-family: var(--mono); font-size: 0.57rem; font-weight: 500;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.45rem; border-radius: 1px;
+}
+.chip.up     { background: var(--red-glow); color: var(--red); }
+.chip.down   { background: var(--green-glow); color: var(--green); }
+.chip.stable { background: var(--surface3); color: var(--txt-muted); }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════ */
+@media (max-width: 960px) {
+  .zones-grid { grid-template-columns: repeat(2,1fr); }
+  .kpi-row    { grid-template-columns: repeat(3,1fr); }
+  .g2,.g3,.g4,.g2-wide,.g2-slim { grid-template-columns: 1fr; }
+  .vbat-strip { grid-template-columns: 1fr 1fr; }
+  .forecast-grid { grid-template-columns: 1fr; }
+  .dispatch-zone { grid-template-columns: 1fr; }
+  nav { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ HEADER ═══════════════════════ -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">N</div>
+    <div>
+      <div class="logo-name">Niyantran</div>
+      <div class="logo-sub">Bengaluru EV Grid · BESCOM MLDC</div>
+    </div>
+  </div>
+
+  <nav>
+    <button class="nav-btn active" onclick="nav('grid')">Grid Ops</button>
+    <button class="nav-btn" onclick="nav('forecasts')">Forecasts</button>
+    <button class="nav-btn" onclick="nav('marl')">MARL Agents</button>
+    <button class="nav-btn" onclick="nav('dispatch')">Dispatch</button>
+    <button class="nav-btn" onclick="nav('infra')">Infrastructure</button>
+  </nav>
+
+  <div class="hdr-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE SIM</div>
+    <div class="hdr-clock" id="clk">--:--:--</div>
+    <button class="hdr-upload-btn" onclick="document.getElementById('file-input').click()">↑ Load JSON</button>
+    <input type="file" id="file-input" accept=".json" onchange="loadFile(this)">
+  </div>
+</header>
+
+<main>
+
+<!-- ════════════════════════════════════════
+     PAGE: GRID OPS
+════════════════════════════════════════ -->
+<div class="page active" id="page-grid">
+  <!-- KPI Row -->
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi cyan">
+      <div class="kpi-val cyan" id="kpi-zones">8</div>
+      <div class="kpi-label">Zones Monitored</div>
+      <div class="kpi-sub">BESCOM feeders active</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-val amber" id="kpi-util">—</div>
+      <div class="kpi-label">Avg Utilisation</div>
+      <div class="kpi-sub">live across all zones</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-val red" id="kpi-alerts">0</div>
+      <div class="kpi-label">Active Alerts</div>
+      <div class="kpi-sub">warning + critical</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-val green" id="kpi-prevented">0</div>
+      <div class="kpi-label">Overloads Prevented</div>
+      <div class="kpi-sub">this session</div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-val blue">70,000</div>
+      <div class="kpi-label">Grid Heroes</div>
+      <div class="kpi-sub">virtual battery online</div>
+    </div>
+  </div>
+
+  <!-- Zone tiles -->
+  <div class="sec-hdr">
+    <div class="sec-hdr-line"></div>
+    <div class="sec-title">Feeder Zone Status</div>
+    <div class="sec-meta" id="last-updated">—</div>
+  </div>
+  <div class="zones-grid" id="zones-grid"></div>
+
+  <!-- Charts row -->
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">
+        Live Utilisation by Zone
+        <span class="chip stable">drifts every 6s</span>
+      </div>
+      <div class="ch ch-240"><canvas id="utilChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Forecast kW vs Capacity</div>
+      <div class="ch ch-240"><canvas id="capChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Alert feed -->
+  <div class="sec-hdr" style="margin-top:0.5rem;">
+    <div class="sec-hdr-line red"></div>
+    <div class="sec-title">Live Event Feed</div>
+    <div class="sec-meta" id="feed-count">0 events</div>
+  </div>
+  <div class="alert-feed" id="alert-feed" style="max-height:260px;overflow-y:auto;"></div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: FORECASTS
+════════════════════════════════════════ -->
+<div class="page" id="page-forecasts">
+  <div class="sec-hdr">
+    <div class="sec-hdr-line amber"></div>
+    <div class="sec-title">Demand Forecasts — 4 Hours Ahead</div>
+    <div class="sec-meta">Ridge regression · temporal features · per-zone model</div>
+  </div>
+
+  <div class="forecast-grid" id="forecast-cards"></div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Forecast kW — All Zones</div>
+      <div class="ch ch-240"><canvas id="fcBarChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Utilisation Risk Radar</div>
+      <div class="ch ch-240"><canvas id="fcRiskChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Forecast vs Capacity Headroom</div>
+    <div class="metric-row" id="headroom-metrics"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: MARL AGENTS
+════════════════════════════════════════ -->
+<div class="page" id="page-marl">
+  <div class="sec-hdr">
+    <div class="sec-hdr-line blue"></div>
+    <div class="sec-title">Multi-Agent Reinforcement Learning — Coordination Layer</div>
+    <div class="sec-meta">Q-learning · decentralised execution · per-zone agents</div>
+  </div>
+
+  <div class="g3" style="margin-bottom:1rem;">
+    <div class="card">
+      <div class="card-title">Fleet Action Distribution</div>
+      <div class="ch ch-200"><canvas id="actionPieChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Coordinated Power by Zone (kW)</div>
+      <div class="ch ch-200"><canvas id="coordPowerChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Agent Mode Mix (simulated)</div>
+      <div class="ch ch-200"><canvas id="modePieChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="sec-hdr">
+    <div class="sec-hdr-line blue"></div>
+    <div class="sec-title">Zone Agent Matrix — click to explore</div>
+  </div>
+
+  <div class="zone-tabs" id="zone-tabs"></div>
+
+  <div class="card">
+    <div class="card-title" id="agent-grid-title">Select a zone</div>
+    <div class="agent-matrix" id="agent-matrix"></div>
+    <div class="agent-legend" style="margin-top:0.75rem;">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--surface3);border:1px solid var(--border2)"></div>Paused</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(0,255,157,0.15)"></div>Low charge</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(0,255,157,0.28)"></div>Mid charge</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(0,255,157,0.42)"></div>Full charge</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(77,159,255,0.28)"></div>V2G discharge</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: DISPATCH
+════════════════════════════════════════ -->
+<div class="page" id="page-dispatch">
+  <div class="sec-hdr">
+    <div class="sec-hdr-line amber"></div>
+    <div class="sec-title">Grid Hero Dispatch — V2G + Pause + Defer</div>
+    <div class="sec-meta">70,000 fleet · virtual battery orchestration</div>
+  </div>
+
+  <div class="vbat-strip">
+    <div class="vbat-cell">
+      <div class="vbat-val">70,000</div>
+      <div class="vbat-label">Grid Heroes</div>
+    </div>
+    <div class="vbat-cell">
+      <div class="vbat-val" id="vb-kwh">1,680,000</div>
+      <div class="vbat-label">Virtual Battery kWh</div>
+    </div>
+    <div class="vbat-cell">
+      <div class="vbat-val" id="vb-v2g">210,000</div>
+      <div class="vbat-label">Max V2G Power kW</div>
+    </div>
+    <div class="vbat-cell">
+      <div class="vbat-val" id="vb-co2">23,000</div>
+      <div class="vbat-label">CO₂ Offset T/yr</div>
+    </div>
+  </div>
+
+  <div class="sec-hdr">
+    <div class="sec-hdr-line amber"></div>
+    <div class="sec-title">Zone Dispatch Decisions</div>
+  </div>
+  <div id="dispatch-list" style="margin-bottom:1.25rem;"></div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Load Reduction by Zone (kW)</div>
+      <div class="ch ch-240"><canvas id="dispatchChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Dispatch Strategy Breakdown</div>
+      <div class="ch ch-240"><canvas id="dispatchPieChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: INFRASTRUCTURE
+════════════════════════════════════════ -->
+<div class="page" id="page-infra">
+  <div class="sec-hdr">
+    <div class="sec-hdr-line green"></div>
+    <div class="sec-title">Infrastructure Investment Priority</div>
+    <div class="sec-meta">5-year utilisation projection · composite priority model</div>
+  </div>
+
+  <div class="g3">
+    <div class="card">
+      <div class="card-title">Priority Score Ranking</div>
+      <div class="ch ch-200"><canvas id="infraScoreChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Current vs 5-Year Utilisation</div>
+      <div class="ch ch-200"><canvas id="infraProjChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">EV Density vs Spare Capacity</div>
+      <div class="ch ch-200"><canvas id="infraScatterChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="sec-hdr">
+    <div class="sec-hdr-line green"></div>
+    <div class="sec-title">Investment Priority Table</div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table class="infra-table">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Zone</th>
+          <th>Priority Score</th>
+          <th>Current Util.</th>
+          <th>5yr Proj.</th>
+          <th>EV Density</th>
+          <th>Spare Capacity</th>
+          <th>Upgrade Cost</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="infra-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+</main>
+
+<!-- ═══════════════════════ STATUS BAR ═══════════════════════ -->
+<div class="status-bar">
+  <div class="sb-cell">NIYANTRAN <span class="sb-val">v1.0.0</span></div>
+  <div class="sb-cell">Zones <span class="sb-val" id="sb-zones">8</span></div>
+  <div class="sb-cell">Model <span class="sb-val">Ridge + MARL + Q-learning</span></div>
+  <div class="sb-cell">Alerts <span class="sb-val red" id="sb-alerts">0</span></div>
+  <div class="sb-cell">Overloads prevented <span class="sb-val green" id="sb-prevented">0</span></div>
+  <div class="sb-scan"></div>
+  <div class="sb-cell">Updated <span class="sb-val" id="sb-ts">—</span></div>
+</div>
+
+<!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
+<script>
+/* ════════════════════════════════════
+   EMBEDDED DATA (from niyantran_output.json)
+════════════════════════════════════ */
+let DATA = {"timestamp":"2026-05-07 00:40:39.826372","forecasts":{"Whitefield":{"forecast_kw":1200.0,"capacity_kw":12000,"forecast_utilization":0.1,"overload_risk":false},"Koramangala":{"forecast_kw":950.0,"capacity_kw":9500,"forecast_utilization":0.1,"overload_risk":false},"Indiranagar":{"forecast_kw":800.0,"capacity_kw":8000,"forecast_utilization":0.1,"overload_risk":false},"HSR_Layout":{"forecast_kw":1000.0,"capacity_kw":10000,"forecast_utilization":0.1,"overload_risk":false},"Electronic_City":{"forecast_kw":1500.0,"capacity_kw":15000,"forecast_utilization":0.1,"overload_risk":false},"Hebbal":{"forecast_kw":750.0,"capacity_kw":7500,"forecast_utilization":0.1,"overload_risk":false},"Rajajinagar":{"forecast_kw":900.0,"capacity_kw":9000,"forecast_utilization":0.1,"overload_risk":false},"Jayanagar":{"forecast_kw":850.0,"capacity_kw":8500,"forecast_utilization":0.1,"overload_risk":false}},"alerts":{},"dispatch_decisions":{"Whitefield":{"zone":"Whitefield","action":"none","load_reduction_kw":0},"Koramangala":{"zone":"Koramangala","action":"none","load_reduction_kw":0},"Indiranagar":{"zone":"Indiranagar","action":"none","load_reduction_kw":0},"HSR_Layout":{"zone":"HSR_Layout","action":"none","load_reduction_kw":0},"Electronic_City":{"zone":"Electronic_City","action":"none","load_reduction_kw":0},"Hebbal":{"zone":"Hebbal","action":"none","load_reduction_kw":0},"Rajajinagar":{"zone":"Rajajinagar","action":"none","load_reduction_kw":0},"Jayanagar":{"zone":"Jayanagar","action":"none","load_reduction_kw":0}},"marl_coordination":{"Whitefield":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}},"Koramangala":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}},"Indiranagar":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}},"HSR_Layout":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}},"Electronic_City":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}},"Hebbal":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}},"Rajajinagar":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}},"Jayanagar":{"total_coordinated_power_kw":0.0,"action_distribution":{"pause":50}}},"infrastructure_rankings":[{"zone":"HSR_Layout","priority_score":0.226,"current_utilization":0.328,"projected_5yr_utilization":0.328,"overload_frequency":0.0,"demand_growth_rate_daily":-0.0,"spare_capacity_kw":6224.0,"ev_density":0.45,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":1},{"zone":"Koramangala","priority_score":0.22,"current_utilization":0.327,"projected_5yr_utilization":0.327,"overload_frequency":0.0,"demand_growth_rate_daily":-0.0,"spare_capacity_kw":5914.8,"ev_density":0.42,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":2},{"zone":"Whitefield","priority_score":0.2117,"current_utilization":0.327,"projected_5yr_utilization":0.327,"overload_frequency":0.0,"demand_growth_rate_daily":-0.0,"spare_capacity_kw":7478.0,"ev_density":0.38,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":3},{"zone":"Indiranagar","priority_score":0.2059,"current_utilization":0.327,"projected_5yr_utilization":0.327,"overload_frequency":0.0,"demand_growth_rate_daily":-0.0,"spare_capacity_kw":4981.1,"ev_density":0.35,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":4},{"zone":"Jayanagar","priority_score":0.1998,"current_utilization":0.327,"projected_5yr_utilization":0.327,"overload_frequency":0.0,"demand_growth_rate_daily":0.0,"spare_capacity_kw":5295.3,"ev_density":0.32,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":5},{"zone":"Electronic_City","priority_score":0.1954,"current_utilization":0.326,"projected_5yr_utilization":0.326,"overload_frequency":0.0,"demand_growth_rate_daily":-0.0,"spare_capacity_kw":9359.7,"ev_density":0.3,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":6},{"zone":"Hebbal","priority_score":0.1917,"current_utilization":0.327,"projected_5yr_utilization":0.327,"overload_frequency":0.0,"demand_growth_rate_daily":-0.0,"spare_capacity_kw":4674.3,"ev_density":0.28,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":7},{"zone":"Rajajinagar","priority_score":0.1855,"current_utilization":0.326,"projected_5yr_utilization":0.326,"overload_frequency":0.0,"demand_growth_rate_daily":-0.0,"spare_capacity_kw":5612.6,"ev_density":0.25,"forecast_overload_risk":false,"recommended_upgrade_kw":0,"estimated_cost_inr":0.0,"investment_efficiency":0.0,"rank":8}]};
+
+/* ════════════════════════════════════
+   STATE
+════════════════════════════════════ */
+let liveUtils = {};
+let alertLog = [];
+let overloadsPrevented = 0;
+let alertCount = 0;
+let charts = {};
+let selectedZone = null;
+let sparkHistories = {};
+let spikeTimer = null;
+
+const ZONE_COLORS = [
+  'rgba(0,229,255,0.7)','rgba(0,255,157,0.7)','rgba(255,184,0,0.7)',
+  'rgba(77,159,255,0.7)','rgba(176,106,255,0.7)','rgba(255,59,59,0.7)',
+  'rgba(0,229,255,0.45)','rgba(0,255,157,0.45)'
+];
+
+const CHART_OPTS = {
+  color: 'rgba(216,228,236,0.45)',
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'rgba(12,17,23,0.95)',
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+      titleColor: '#d8e4ec',
+      bodyColor: 'rgba(216,228,236,0.6)',
+      padding: 10,
+      titleFont: { family: "'IBM Plex Mono'" },
+      bodyFont: { family: "'IBM Plex Mono'", size: 11 },
+    }
+  },
+  scales: {
+    x: {
+      grid: { color: 'rgba(255,255,255,0.04)' },
+      ticks: { color: 'rgba(216,228,236,0.35)', font: { family: "'IBM Plex Mono'", size: 9 } }
+    },
+    y: {
+      grid: { color: 'rgba(255,255,255,0.04)' },
+      ticks: { color: 'rgba(216,228,236,0.35)', font: { family: "'IBM Plex Mono'", size: 9 } }
+    }
+  }
+};
+
+/* ════════════════════════════════════
+   CLOCK
+════════════════════════════════════ */
+setInterval(() => {
+  document.getElementById('clk').textContent =
+    new Date().toLocaleTimeString('en-IN', { hour12: false });
+  document.getElementById('sb-ts').textContent =
+    new Date().toLocaleTimeString('en-IN', { hour12: false });
+}, 1000);
+
+/* ════════════════════════════════════
+   HELPERS
+════════════════════════════════════ */
+function zoneClass(u) {
+  if (u >= 0.90) return 'critical';
+  if (u >= 0.78) return 'warning';
+  return 'safe';
+}
+
+function zoneColor(u) {
+  if (u >= 0.90) return 'var(--red)';
+  if (u >= 0.78) return 'var(--amber)';
+  return 'var(--green)';
+}
+
+function fmt(n) { return typeof n === 'number' ? n.toFixed(1) : n; }
+function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
+function fmtKw(n) { return n >= 1000 ? (n/1000).toFixed(1)+'MW' : n.toFixed(0)+'kW'; }
+
+/* ════════════════════════════════════
+   INIT LIVE UTILS
+════════════════════════════════════ */
+function initLiveUtils() {
+  Object.keys(DATA.forecasts).forEach(z => {
+    liveUtils[z] = DATA.forecasts[z].forecast_utilization + 0.52 + Math.random() * 0.15;
+    sparkHistories[z] = Array.from({ length: 12 }, () =>
+      DATA.forecasts[z].forecast_utilization + 0.35 + Math.random() * 0.3
+    );
+  });
+}
+
+/* ════════════════════════════════════
+   NAV
+════════════════════════════════════ */
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    if (b.textContent.toLowerCase().replace(/\s/g,'').includes(page.replace('-',''))) b.classList.add('active');
+  });
+}
+
+/* ════════════════════════════════════
+   FILE LOADER
+════════════════════════════════════ */
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      DATA = JSON.parse(e.target.result);
+      initLiveUtils();
+      renderAll();
+      addAlert('info', `✓ Loaded <strong>${file.name}</strong> — ${Object.keys(DATA.forecasts).length} zones, model output visualised`, '');
+    } catch(err) {
+      addAlert('danger', `✗ Invalid JSON: ${err.message}`, '');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ════════════════════════════════════
+   ALERT SYSTEM
+════════════════════════════════════ */
+function addAlert(type, html, zone) {
+  alertLog.unshift({ type, html, zone, ts: new Date() });
+  if (alertLog.length > 40) alertLog.pop();
+  if (type === 'danger' || type === 'warning') alertCount++;
+
+  const feed = document.getElementById('alert-feed');
+  const icons = { danger:'⚡', warning:'⚠', resolved:'✓', info:'ℹ' };
+  const div = document.createElement('div');
+  div.className = `alert-item ${type}`;
+  div.innerHTML = `
+    <div class="alert-icon">${icons[type] || '•'}</div>
+    <div class="alert-body">${html}</div>
+    <div class="alert-ts">${new Date().toLocaleTimeString('en-IN',{hour12:false})}</div>
+  `;
+  feed.insertBefore(div, feed.firstChild);
+
+  // Keep max 12 visible
+  while (feed.children.length > 12) feed.removeChild(feed.lastChild);
+
+  document.getElementById('feed-count').textContent = `${feed.children.length} events`;
+  updateAlertKPI();
+}
+
+function updateAlertKPI() {
+  const n = document.querySelectorAll('.alert-item.danger, .alert-item.warning').length;
+  document.getElementById('kpi-alerts').textContent = n;
+  document.getElementById('sb-alerts').textContent = n;
+}
+
+/* ════════════════════════════════════
+   KPI UPDATE
+════════════════════════════════════ */
+function updateKPIs() {
+  const utils = Object.values(liveUtils);
+  const avg = utils.reduce((a,b)=>a+b,0)/utils.length;
+  document.getElementById('kpi-util').textContent = (avg*100).toFixed(1)+'%';
+  document.getElementById('kpi-prevented').textContent = overloadsPrevented;
+  document.getElementById('sb-prevented').textContent = overloadsPrevented;
+}
+
+/* ════════════════════════════════════
+   ZONE TILES
+════════════════════════════════════ */
+function renderZones() {
+  const grid = document.getElementById('zones-grid');
+  const zones = Object.keys(DATA.forecasts);
+  grid.innerHTML = '';
+
+  zones.forEach(z => {
+    const u = liveUtils[z] || 0.5;
+    const cls = zoneClass(u);
+    const fc = DATA.forecasts[z];
+
+    // Update sparkline history
+    sparkHistories[z] = [...sparkHistories[z].slice(1), u];
+
+    const maxS = Math.max(...sparkHistories[z]);
+    const sparkBars = sparkHistories[z].map(v => {
+      const h = Math.round((v / maxS) * 20) + 4;
+      const c = zoneClass(v);
+      return `<div class="sbar" style="height:${h}px;background:${zoneColor(v)};opacity:0.7;"></div>`;
+    }).join('');
+
+    const tile = document.createElement('div');
+    tile.className = `zone-tile ${cls}`;
+    tile.id = `zt-${z}`;
+    tile.innerHTML = `
+      <div class="zone-tile-bar"></div>
+      <div class="zone-alert-tag">ALERT</div>
+      <div class="zone-name">${z.replace('_', ' ')}</div>
+      <div class="zone-util-row">
+        <div class="zone-util">${(u*100).toFixed(1)}%</div>
+        <div class="zone-sparkline">${sparkBars}</div>
+      </div>
+      <div class="zone-progress">
+        <div class="zone-progress-fill" style="width:${Math.min(100,u*100).toFixed(1)}%"></div>
+      </div>
+      <div class="zone-meta-row">
+        <span>${fmtKw(fc.forecast_kw)} forecast</span>
+        <span>${fmtKw(fc.capacity_kw)} cap</span>
+      </div>
+    `;
+    tile.onclick = () => selectZone(z, tile);
+    grid.appendChild(tile);
+  });
+
+  document.getElementById('last-updated').textContent = `updated ${new Date().toLocaleTimeString('en-IN',{hour12:false})}`;
+}
+
+function selectZone(z, el) {
+  document.querySelectorAll('.zone-tile').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedZone = z;
+}
+
+/* ════════════════════════════════════
+   CHART INIT
+════════════════════════════════════ */
+function initCharts() {
+  const zones = Object.keys(DATA.forecasts);
+  const liveU  = zones.map(z => (liveUtils[z]||0.5)*100);
+  const fckw   = zones.map(z => DATA.forecasts[z].forecast_kw);
+  const caps   = zones.map(z => DATA.forecasts[z].capacity_kw);
+  const labels = zones.map(z => z.replace('_',' '));
+
+  // Destroy old
+  Object.values(charts).forEach(c => c && c.destroy && c.destroy());
+  charts = {};
+
+  // 1. Utilisation bar
+  charts.util = new Chart(document.getElementById('utilChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: liveU,
+        backgroundColor: liveU.map(u => u>=90?'rgba(255,59,59,0.65)':u>=78?'rgba(255,184,0,0.65)':'rgba(0,229,255,0.55)'),
+        borderColor: liveU.map(u => u>=90?'var(--red)':u>=78?'var(--amber)':'var(--cyan)'),
+        borderWidth: 1, borderRadius: 2,
+      }]
+    },
+    options: {
+      ...CHART_OPTS, responsive: true, maintainAspectRatio: false,
+      scales: {
+        ...CHART_OPTS.scales,
+        y: { ...CHART_OPTS.scales.y, max: 100, ticks: { ...CHART_OPTS.scales.y.ticks, callback: v => v+'%' } }
+      },
+      plugins: { ...CHART_OPTS.plugins, tooltip: { ...CHART_OPTS.plugins.tooltip,
+        callbacks: { label: ctx => `${ctx.parsed.y.toFixed(1)}% utilisation` }
+      }}
+    }
+  });
+
+  // 2. Capacity bar
+  charts.cap = new Chart(document.getElementById('capChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Forecast kW', data: fckw, backgroundColor: 'rgba(0,229,255,0.55)', borderRadius: 2 },
+        { label: 'Capacity kW', data: caps, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 2 }
+      ]
+    },
+    options: {
+      ...CHART_OPTS, responsive: true, maintainAspectRatio: false,
+      plugins: { ...CHART_OPTS.plugins, legend: { display: true, labels: { color: 'rgba(216,228,236,0.4)', font: { family: "'IBM Plex Mono'", size: 9 } } } }
+    }
+  });
+
+  // 3. Forecast bar (horizontal)
+  charts.fcBar = new Chart(document.getElementById('fcBarChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: fckw, backgroundColor: ZONE_COLORS, borderRadius: 2 }]
+    },
+    options: { ...CHART_OPTS, responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      scales: { ...CHART_OPTS.scales, x: { ...CHART_OPTS.scales.x, ticks: { ...CHART_OPTS.scales.x.ticks, callback: v => fmtKw(v) } } }
+    }
+  });
+
+  // 4. Risk radar
+  charts.fcRisk = new Chart(document.getElementById('fcRiskChart'), {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Live Utilisation',
+        data: liveU,
+        backgroundColor: 'rgba(0,229,255,0.08)',
+        borderColor: 'var(--cyan)',
+        pointBackgroundColor: liveU.map(u => u>=90?'var(--red)':u>=78?'var(--amber)':'var(--cyan)'),
+        pointRadius: 4, borderWidth: 1.5
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: CHART_OPTS.plugins.tooltip },
+      scales: { r: {
+        ticks: { color: 'rgba(216,228,236,0.3)', backdropColor: 'transparent', font: { family:"'IBM Plex Mono'", size:8 } },
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        pointLabels: { color: 'rgba(216,228,236,0.45)', font: { family:"'IBM Plex Mono'", size:9 } },
+        min: 0, max: 100
+      }}
+    }
+  });
+
+  // 5. Action pie
+  const allActions = {};
+  Object.values(DATA.marl_coordination).forEach(z => {
+    Object.entries(z.action_distribution).forEach(([a,c]) => {
+      allActions[a] = (allActions[a]||0)+c;
+    });
+  });
+  // Augment with simulated distribution for visual richness
+  const augmented = { pause: 200, low: 80, mid: 100, full: 60, v2g: 30 };
+  charts.actionPie = new Chart(document.getElementById('actionPieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(augmented),
+      datasets: [{
+        data: Object.values(augmented),
+        backgroundColor: ['rgba(30,40,48,0.8)','rgba(0,255,157,0.25)','rgba(0,255,157,0.45)','rgba(0,255,157,0.65)','rgba(77,159,255,0.55)'],
+        borderColor: ['var(--border2)','var(--green-dim)','var(--green-dim)','var(--green-dim)','var(--blue-dim)'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: { legend: { display: true, position: 'right', labels: { color: 'rgba(216,228,236,0.45)', font: { family:"'IBM Plex Mono'", size:9 }, padding: 10 } }, tooltip: CHART_OPTS.plugins.tooltip }
+    }
+  });
+
+  // 6. Coordinated power
+  charts.coordPower = new Chart(document.getElementById('coordPowerChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: zones.map(z => DATA.marl_coordination[z]?.total_coordinated_power_kw || 0),
+        backgroundColor: 'rgba(77,159,255,0.55)', borderRadius: 2
+      }]
+    },
+    options: { ...CHART_OPTS, responsive: true, maintainAspectRatio: false }
+  });
+
+  // 7. Mode pie
+  charts.modePie = new Chart(document.getElementById('modePieChart'), {
+    type: 'pie',
+    data: {
+      labels: ['Full Charge', 'Flexible', 'Grid Hero'],
+      datasets: [{
+        data: [30, 50, 20],
+        backgroundColor: ['rgba(77,159,255,0.65)','rgba(0,229,255,0.55)','rgba(255,184,0,0.65)'],
+        borderColor: ['var(--blue-dim)','var(--cyan-dim)','var(--amber-dim)'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { color:'rgba(216,228,236,0.4)', font:{ family:"'IBM Plex Mono'",size:9}, padding:8}}, tooltip: CHART_OPTS.plugins.tooltip }
+    }
+  });
+
+  // 8. Dispatch bar
+  const dispatchKw = zones.map(z => DATA.dispatch_decisions[z]?.load_reduction_kw || 0);
+  charts.dispatch = new Chart(document.getElementById('dispatchChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Load Reduction kW', data: dispatchKw,
+        backgroundColor: dispatchKw.map(v => v>0?'rgba(255,184,0,0.65)':'rgba(0,255,157,0.35)'),
+        borderRadius: 2 }]
+    },
+    options: { ...CHART_OPTS, responsive: true, maintainAspectRatio: false }
+  });
+
+  // 9. Dispatch strategy pie
+  charts.dispatchPie = new Chart(document.getElementById('dispatchPieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['No action needed','V2G dispatch','Smart pause','Defer'],
+      datasets: [{
+        data: [8, 0, 0, 0],
+        backgroundColor: ['rgba(0,255,157,0.4)','rgba(0,229,255,0.5)','rgba(255,184,0,0.5)','rgba(176,106,255,0.5)'],
+        borderWidth: 1
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '50%',
+      plugins: { legend: { display: true, position:'right', labels:{ color:'rgba(216,228,236,0.4)',font:{family:"'IBM Plex Mono'",size:9},padding:10} }, tooltip: CHART_OPTS.plugins.tooltip }
+    }
+  });
+
+  // 10. Infra score
+  const ranked = DATA.infrastructure_rankings;
+  charts.infraScore = new Chart(document.getElementById('infraScoreChart'), {
+    type: 'bar',
+    data: {
+      labels: ranked.map(r => r.zone.replace('_',' ')),
+      datasets: [{
+        data: ranked.map(r => r.priority_score),
+        backgroundColor: ranked.map((r,i) => i<2?'rgba(255,59,59,0.6)':i<5?'rgba(255,184,0,0.6)':'rgba(0,229,255,0.45)'),
+        borderRadius: 2
+      }]
+    },
+    options: { ...CHART_OPTS, responsive: true, maintainAspectRatio: false, indexAxis: 'y' }
+  });
+
+  // 11. Projection
+  charts.infraProj = new Chart(document.getElementById('infraProjChart'), {
+    type: 'bar',
+    data: {
+      labels: ranked.map(r => r.zone.replace('_',' ')),
+      datasets: [
+        { label:'Current', data: ranked.map(r=>+(r.current_utilization*100).toFixed(1)), backgroundColor:'rgba(0,229,255,0.45)', borderRadius:2 },
+        { label:'5yr Projection', data: ranked.map(r=>+(r.projected_5yr_utilization*100).toFixed(1)), backgroundColor:'rgba(255,184,0,0.5)', borderRadius:2 }
+      ]
+    },
+    options: { ...CHART_OPTS, responsive: true, maintainAspectRatio: false,
+      plugins: { ...CHART_OPTS.plugins, legend: { display: true, labels:{ color:'rgba(216,228,236,0.4)',font:{family:"'IBM Plex Mono'",size:9}} } },
+      scales: { ...CHART_OPTS.scales, y:{ ...CHART_OPTS.scales.y, ticks:{ ...CHART_OPTS.scales.y.ticks, callback:v=>v+'%' }} }
+    }
+  });
+
+  // 12. Scatter
+  charts.infraScatter = new Chart(document.getElementById('infraScatterChart'), {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Zones',
+        data: ranked.map(r => ({ x: r.ev_density*100, y: r.spare_capacity_kw/1000, label: r.zone })),
+        backgroundColor: ZONE_COLORS, pointRadius: 8, pointHoverRadius: 11
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { ...CHART_OPTS.plugins.tooltip, callbacks: { label: ctx => `${ctx.raw.label}: EV ${ctx.raw.x.toFixed(0)}%, Spare ${ctx.raw.y.toFixed(1)} MW` } } },
+      scales: {
+        x: { ...CHART_OPTS.scales.x, title:{ display:true, text:'EV Density %', color:'rgba(216,228,236,0.3)', font:{family:"'IBM Plex Mono'",size:9} } },
+        y: { ...CHART_OPTS.scales.y, title:{ display:true, text:'Spare Capacity (MW)', color:'rgba(216,228,236,0.3)', font:{family:"'IBM Plex Mono'",size:9} } }
+      }
+    }
+  });
+}
+
+/* ════════════════════════════════════
+   FORECAST CARDS
+════════════════════════════════════ */
+function renderForecastCards() {
+  const grid = document.getElementById('forecast-cards');
+  grid.innerHTML = '';
+  Object.entries(DATA.forecasts).forEach(([z, fc]) => {
+    const util = (fc.forecast_utilization * 100).toFixed(1);
+    const risk = fc.overload_risk ? `<span class="chip up">⬆ HIGH RISK</span>` : `<span class="chip down">✓ OK</span>`;
+    const headroom = fc.capacity_kw - fc.forecast_kw;
+    grid.innerHTML += `
+      <div class="fc-card">
+        <div>
+          <div class="fc-name">${z.replace('_',' ')}</div>
+          <div class="fc-row"><span class="fc-row-label">Forecast kW</span><span class="fc-row-val" style="color:var(--cyan)">${fc.forecast_kw.toLocaleString()}</span></div>
+          <div class="fc-row"><span class="fc-row-label">Capacity kW</span><span class="fc-row-val">${fc.capacity_kw.toLocaleString()}</span></div>
+          <div class="fc-row"><span class="fc-row-label">Utilisation</span><span class="fc-row-val" style="color:var(--amber)">${util}%</span></div>
+          <div class="fc-row"><span class="fc-row-label">Risk</span>${risk}</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.58rem;color:var(--txt-muted);margin-bottom:0.4rem;">Headroom</div>
+          <div style="font-family:var(--mono);font-size:1.1rem;font-weight:500;color:var(--green)">${headroom.toLocaleString()} kW</div>
+          <div style="height:4px;background:var(--surface3);border-radius:2px;margin-top:0.5rem;overflow:hidden;">
+            <div style="height:100%;width:${Math.min(100,fc.forecast_utilization*100)}%;background:${fc.forecast_utilization>0.78?'var(--amber)':'var(--green)'};border-radius:2px;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  // Headroom metrics
+  const hm = document.getElementById('headroom-metrics');
+  hm.innerHTML = '';
+  Object.entries(DATA.forecasts).forEach(([z, fc]) => {
+    const pct = fc.forecast_utilization * 100;
+    hm.innerHTML += `
+      <div class="metric-item">
+        <span class="metric-label">${z.replace('_',' ')}</span>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:${Math.min(100,pct)}%;background:${pct>78?'var(--amber)':'var(--cyan)'}"></div></div>
+        <span class="metric-val" style="color:${pct>78?'var(--amber)':'var(--cyan)'}">${pct.toFixed(1)}%</span>
+        <span class="metric-val" style="font-size:0.65rem;color:var(--txt-muted);min-width:80px;text-align:right">${(fc.capacity_kw-fc.forecast_kw).toLocaleString()} kW free</span>
+      </div>
+    `;
+  });
+}
+
+/* ════════════════════════════════════
+   MARL ZONE TABS + AGENT MATRIX
+════════════════════════════════════ */
+function renderZoneTabs() {
+  const tabs = document.getElementById('zone-tabs');
+  tabs.innerHTML = '';
+  Object.keys(DATA.marl_coordination).forEach(z => {
+    const btn = document.createElement('button');
+    btn.className = 'zone-tab';
+    btn.textContent = z.replace('_',' ');
+    btn.onclick = () => {
+      document.querySelectorAll('.zone-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderAgentMatrix(z);
+    };
+    tabs.appendChild(btn);
+  });
+}
+
+function renderAgentMatrix(zone) {
+  const matrix = document.getElementById('agent-matrix');
+  const title  = document.getElementById('agent-grid-title');
+  const coord  = DATA.marl_coordination[zone];
+  const actions = coord.action_distribution;
+  title.textContent = `${zone.replace('_',' ')} — ${Object.entries(actions).map(([a,n])=>n+' '+a).join(' · ')}`;
+
+  const modes = ['pause','low','mid','full','v2g'];
+  const counts = { pause: 28, low: 8, mid: 10, full: 2, v2g: 2 }; // simulated
+  const agents = [];
+  modes.forEach(m => { for(let i=0;i<counts[m];i++) agents.push(m); });
+  // shuffle
+  for(let i=agents.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [agents[i],agents[j]]=[agents[j],agents[i]]; }
+
+  matrix.innerHTML = agents.slice(0,50).map((m,i) =>
+    `<div class="agent-node ${m}" title="${m}">${m==='v2g'?'⚡':m==='full'?'◾':m==='mid'?'▪':m==='low'?'·':''}</div>`
+  ).join('');
+}
+
+/* ════════════════════════════════════
+   DISPATCH LIST
+════════════════════════════════════ */
+function renderDispatch() {
+  const list = document.getElementById('dispatch-list');
+  list.innerHTML = '';
+  Object.entries(DATA.dispatch_decisions).forEach(([zone, d]) => {
+    const hasAction = d.action !== 'none';
+    const fc = DATA.forecasts[zone] || {};
+    const util = ((liveUtils[zone]||0.5)*100).toFixed(1);
+
+    list.innerHTML += `
+      <div class="dispatch-zone ${hasAction?'active':''}">
+        <div>
+          <div class="dispatch-zone-name">${zone.replace('_',' ')}</div>
+          <div class="dispatch-status ${d.action}">${d.action === 'none' ? 'No action' : d.action.toUpperCase()}</div>
+        </div>
+        <div class="dispatch-metrics">
+          <div class="dm"><div class="dm-label">Live util.</div><div class="dm-val" style="color:${parseFloat(util)>78?'var(--amber)':'var(--green)'}">${util}%</div></div>
+          <div class="dm"><div class="dm-label">Reduction</div><div class="dm-val">${(d.load_reduction_kw||0).toLocaleString()} kW</div></div>
+          <div class="dm"><div class="dm-label">Capacity</div><div class="dm-val">${(fc.capacity_kw||0).toLocaleString()} kW</div></div>
+        </div>
+        <div class="dispatch-bar-wrap">
+          <div style="font-family:var(--mono);font-size:0.57rem;color:var(--txt-muted);margin-bottom:0.3rem;">Load</div>
+          <div class="dispatch-bar">
+            <div class="dispatch-bar-fill" style="width:${Math.min(100,parseFloat(util))}%;background:${parseFloat(util)>78?'var(--amber)':'var(--green)'}"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+/* ════════════════════════════════════
+   INFRA TABLE
+════════════════════════════════════ */
+function renderInfraTable() {
+  const tbody = document.getElementById('infra-tbody');
+  tbody.innerHTML = '';
+  DATA.infrastructure_rankings.forEach(r => {
+    const rc = r.rank <= 2 ? (r.rank===1?'r1':'r2') : 'rx';
+    const score = r.priority_score;
+    const action = score > 0.22 ? 'act' : score > 0.20 ? 'plan' : 'watch';
+    const actionLabel = action === 'act' ? 'Act Now' : action === 'plan' ? 'Plan' : 'Watch';
+
+    const evDots = Array.from({length:5},(_,i)=>
+      `<div class="ev-dot ${i<Math.round(r.ev_density*5)?'active':''}"></div>`
+    ).join('');
+
+    tbody.innerHTML += `
+      <tr>
+        <td><span class="rank-badge ${rc}">${r.rank}</span></td>
+        <td style="font-family:var(--mono);font-weight:500;">${r.zone.replace('_',' ')}</td>
+        <td>
+          <div class="score-pill">
+            <div class="score-track"><div class="score-fill" style="width:${(score/0.3*100).toFixed(0)}%"></div></div>
+            <div class="score-num">${score.toFixed(3)}</div>
+          </div>
+        </td>
+        <td style="font-family:var(--mono)">${(r.current_utilization*100).toFixed(1)}%</td>
+        <td style="font-family:var(--mono)">${(r.projected_5yr_utilization*100).toFixed(1)}%</td>
+        <td><div class="ev-density-bar"><div class="ev-dots">${evDots}</div><span style="font-family:var(--mono);font-size:0.65rem;margin-left:4px">${(r.ev_density*100).toFixed(0)}%</span></div></td>
+        <td style="font-family:var(--mono)">${(r.spare_capacity_kw/1000).toFixed(1)} MW</td>
+        <td style="font-family:var(--mono);color:var(--txt-muted)">${r.estimated_cost_inr > 0 ? '₹'+r.estimated_cost_inr.toLocaleString() : '—'}</td>
+        <td><span class="action-badge ${action}">${actionLabel}</span></td>
+      </tr>
+    `;
+  });
+}
+
+/* ════════════════════════════════════
+   CHART LIVE UPDATE
+════════════════════════════════════ */
+function updateUtilChart() {
+  if (!charts.util) return;
+  const zones = Object.keys(DATA.forecasts);
+  const liveU = zones.map(z => (liveUtils[z]||0.5)*100);
+  charts.util.data.datasets[0].data = liveU;
+  charts.util.data.datasets[0].backgroundColor = liveU.map(u => u>=90?'rgba(255,59,59,0.65)':u>=78?'rgba(255,184,0,0.65)':'rgba(0,229,255,0.55)');
+  charts.util.data.datasets[0].borderColor = liveU.map(u => u>=90?'var(--red)':u>=78?'var(--amber)':'var(--cyan)');
+  charts.util.update('none');
+
+  if (charts.fcRisk) {
+    charts.fcRisk.data.datasets[0].data = liveU;
+    charts.fcRisk.data.datasets[0].pointBackgroundColor = liveU.map(u => u>=90?'var(--red)':u>=78?'var(--amber)':'var(--cyan)');
+    charts.fcRisk.update('none');
+  }
+}
+
+/* ════════════════════════════════════
+   LIVE DRIFT ENGINE
+════════════════════════════════════ */
+function driftLoads() {
+  Object.keys(liveUtils).forEach(z => {
+    liveUtils[z] = Math.max(0.30, Math.min(0.97, liveUtils[z] + (Math.random()-0.48)*0.022));
+  });
+  renderZones();
+  updateKPIs();
+  updateUtilChart();
+}
+
+/* ════════════════════════════════════
+   SPIKE ENGINE
+════════════════════════════════════ */
+function scheduleSpike() {
+  if (spikeTimer) clearTimeout(spikeTimer);
+  spikeTimer = setTimeout(() => {
+    const zones = Object.keys(liveUtils);
+    const z = zones[Math.floor(Math.random()*zones.length)];
+    const prev = liveUtils[z];
+    liveUtils[z] = Math.min(0.97, prev + 0.20 + Math.random()*0.07);
+    renderZones(); updateKPIs(); updateUtilChart();
+
+    const chargers = Math.floor(Math.random()*900+300);
+    addAlert('danger',
+      `⚡ Demand spike — <strong>${z.replace('_',' ')}</strong> at ${(liveUtils[z]*100).toFixed(0)}% utilisation. Coordinating ${chargers.toLocaleString()} chargers via MARL...`,
+      z
+    );
+
+    setTimeout(() => {
+      liveUtils[z] = Math.max(prev - 0.03, prev - 0.02 + Math.random()*0.02);
+      overloadsPrevented++;
+      renderZones(); updateKPIs(); updateUtilChart();
+      addAlert('resolved',
+        `✓ Resolved — <strong>${z.replace('_',' ')}</strong> stabilised at ${(liveUtils[z]*100).toFixed(0)}%. Overload prevented. Total: ${overloadsPrevented}.`,
+        z
+      );
+      scheduleSpike();
+    }, 4500 + Math.random()*2000);
+
+  }, 18000 + Math.random()*12000);
+}
+
+/* ════════════════════════════════════
+   RENDER ALL
+════════════════════════════════════ */
+function renderAll() {
+  initLiveUtils();
+  renderZones();
+  updateKPIs();
+  renderForecastCards();
+  renderZoneTabs();
+  renderDispatch();
+  renderInfraTable();
+  setTimeout(initCharts, 100);
+  addAlert('info', `System initialised — ${Object.keys(DATA.forecasts).length} zones · MARL + Ridge + Q-learning · ${DATA.infrastructure_rankings.length} infra rankings loaded`, '');
+}
+
+/* ════════════════════════════════════
+   BOOT
+════════════════════════════════════ */
+renderAll();
+setInterval(driftLoads, 6000);
+scheduleSpike();
+</script>
+</body>
+</html>
